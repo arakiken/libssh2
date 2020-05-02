@@ -610,7 +610,17 @@ int _libssh2_wait_socket(LIBSSH2_SESSION *session, time_t start_time)
         (seconds_to_next == 0 ||
          ms_to_next > session->api_timeout)) {
         time_t now = time(NULL);
+#ifdef HAVE_WINSOCK2_H
+        /* XXX i686-pc-mingw32-gcc 4.7.3 uses difftime32 by default even if time_t is 64bit. */
+        if (sizeof(time_t) == 8) {
+            elapsed_ms = (long)(1000*_difftime64(now, start_time));
+        }
+        else {
+            elapsed_ms = (long)(1000*_difftime32(now, start_time));
+        }
+#else
         elapsed_ms = (long)(1000*difftime(now, start_time));
+#endif
         if(elapsed_ms > session->api_timeout) {
             return _libssh2_error(session, LIBSSH2_ERROR_TIMEOUT,
                                   "API timeout expired");

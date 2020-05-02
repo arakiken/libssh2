@@ -3232,8 +3232,15 @@ case "$host" in
     CFLAGS="$CFLAGS -DLIBSSH2_WIN32"
     LIBS="$LIBS -lws2_32"
     ;;
-	*-cygwin)
-	CFLAGS="$CFLAGS -DLIBSSH2_WIN32"
+    *-cygwin)
+    CFLAGS="$CFLAGS -DLIBSSH2_WIN32"
+    case "${CC} ${CFLAGS}" in
+        *mno-cygwin*|*-mingw*)
+        LIBS="$LIBS -lws2_32"
+        ;;
+        *)
+        ;;
+    esac
     ;;
 	*darwin*)
 	CFLAGS="$CFLAGS -DLIBSSH2_DARWIN"
@@ -18014,7 +18021,27 @@ fi
 
 case $host in
   *-*-cygwin* | *-*-cegcc*)
-    # These are POSIX-like systems using BSD-like sockets API.
+    case "${CC} ${CFLAGS}" in
+      *mno-cygwin* | *-mingw*)
+    for ac_header in windows.h winsock2.h ws2tcpip.h
+do :
+  as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
+ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
+eval as_val=\$$as_ac_Header
+   if test "x$as_val" = x""yes; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+
+done
+
+        ;;
+      *)
+        # These are POSIX-like systems using BSD-like sockets API.
+        ;;
+      esac
     ;;
   *)
     for ac_header in windows.h winsock2.h ws2tcpip.h

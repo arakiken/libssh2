@@ -629,10 +629,10 @@ void _libssh2_list_insert(struct list_node *after, /* insert before this */
 /* Offset between 1/1/1601 and 1/1/1970 in 100 nanosec units */
 #define _W32_FT_OFFSET (116444736000000000)
 
-int __cdecl _libssh2_gettimeofday(struct timeval *tp, void *tzp)
+int /* __cdecl */ _libssh2_gettimeofday(struct timeval *tp, void *tzp)
 {
     union {
-        unsigned __int64 ns100; /*time since 1 Jan 1601 in 100ns units */
+        uint64_t ns100; /*time since 1 Jan 1601 in 100ns units */
         FILETIME ft;
     } _now;
     (void)tzp;

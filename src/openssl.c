@@ -685,6 +685,118 @@ void _libssh2_openssl_crypto_exit(void)
 #endif
 }
 
+
+#if LIBSSH2_CAMELLIA
+
+#include <openssl/camellia.h>
+
+struct ssh_camellia_ctr_ctx
+{
+	CAMELLIA_KEY	camellia_ctx;
+	u_char		camellia_counter[CAMELLIA_BLOCK_SIZE];
+};
+
+static int
+camellia_ctr_init(EVP_CIPHER_CTX *ctx, const u_char *key, const u_char *iv,
+    int enc)
+{
+	struct ssh_camellia_ctr_ctx *c;
+
+	if ((c = EVP_CIPHER_CTX_get_app_data(ctx)) == NULL) {
+		c = malloc(sizeof(*c));
+		EVP_CIPHER_CTX_set_app_data(ctx, c);
+	}
+	if (key != NULL)
+		Camellia_set_key(key,
+		    EVP_CIPHER_CTX_key_length(ctx) * 8,
+		    &c->camellia_ctx);
+	if (iv != NULL)
+		memcpy(c->camellia_counter, iv, CAMELLIA_BLOCK_SIZE);
+	return (1);
+}
+
+static int
+camellia_ctr_cleanup(EVP_CIPHER_CTX *ctx)
+{
+	struct ssh_camellia_ctr_ctx *c;
+
+	if ((c = EVP_CIPHER_CTX_get_app_data(ctx)) != NULL) {
+		memset(c, 0, sizeof(*c));
+		free(c);
+		EVP_CIPHER_CTX_set_app_data(ctx, NULL);
+	}
+	return (1);
+}
+
+static int
+camellia_ctr_do_cipher(EVP_CIPHER_CTX *ctx, u_char *dest, const u_char *src,
+    size_t len)
+{
+	struct ssh_camellia_ctr_ctx *c;
+	u_int n = 0;
+	u_char buf[CAMELLIA_BLOCK_SIZE];
+
+	if (len == 0)
+		return (1);
+	if ((c = EVP_CIPHER_CTX_get_app_data(ctx)) == NULL)
+		return (0);
+
+	while ((len--) > 0) {
+		if (n == 0) {
+			int i;
+			Camellia_encrypt(c->camellia_counter, buf, &c->camellia_ctx);
+			for (i = CAMELLIA_BLOCK_SIZE - 1; i >= 0 ; i--)
+				if (++c->camellia_counter[i])
+					break;
+		}
+		*(dest++) = *(src++) ^ buf[n];
+		n = (n + 1) % CAMELLIA_BLOCK_SIZE;
+	}
+	return (1);
+}
+
+static const EVP_CIPHER *
+camellia_make_ctr_evp (size_t keylen, EVP_CIPHER *camellia_ctr_cipher)
+{
+    memset(camellia_ctr_cipher,0,sizeof(EVP_CIPHER));
+    camellia_ctr_cipher->nid = NID_undef;
+    camellia_ctr_cipher->block_size = CAMELLIA_BLOCK_SIZE;
+    camellia_ctr_cipher->key_len = keylen;
+    camellia_ctr_cipher->iv_len = CAMELLIA_BLOCK_SIZE;
+    camellia_ctr_cipher->init = camellia_ctr_init;
+    camellia_ctr_cipher->do_cipher = camellia_ctr_do_cipher;
+    camellia_ctr_cipher->cleanup = camellia_ctr_cleanup;
+
+    return camellia_ctr_cipher;
+}
+
+const EVP_CIPHER *
+_libssh2_EVP_camellia_128_ctr(void)
+{
+    static EVP_CIPHER camellia_ctr_cipher;
+    return !camellia_ctr_cipher.key_len?
+        camellia_make_ctr_evp (16, &camellia_ctr_cipher) : &camellia_ctr_cipher;
+}
+
+const EVP_CIPHER *
+_libssh2_EVP_camellia_192_ctr(void)
+{
+    static EVP_CIPHER camellia_ctr_cipher;
+    return !camellia_ctr_cipher.key_len?
+        camellia_make_ctr_evp (24, &camellia_ctr_cipher) : &camellia_ctr_cipher;
+}
+
+const EVP_CIPHER *
+_libssh2_EVP_camellia_256_ctr(void)
+{
+    static EVP_CIPHER camellia_ctr_cipher;
+    return !camellia_ctr_cipher.key_len?
+        camellia_make_ctr_evp (32, &camellia_ctr_cipher) : &camellia_ctr_cipher;
+}
+
+#endif	/* LIBSSH2_CAMELLIA */
+
+
 /* TODO: Optionally call a passphrase callback specified by the
  * calling program
  */

@@ -214,6 +214,82 @@ static const LIBSSH2_CRYPT_METHOD
 };
 #endif /* LIBSSH2_AES */
 
+#if  LIBSSH2_CAMELLIA
+static const LIBSSH2_CRYPT_METHOD libssh2_crypt_method_camellia128_cbc = {
+    "camellia128-cbc",
+    16,                         /* blocksize */
+    16,                         /* initial value length */
+    16,                         /* secret length -- 16*8 == 128bit */
+    0,                          /* flags */
+    &crypt_init,
+    &crypt_encrypt,
+    &crypt_dtor,
+    EVP_camellia_128_cbc
+};
+
+static const LIBSSH2_CRYPT_METHOD libssh2_crypt_method_camellia192_cbc = {
+    "camellia192-cbc",
+    16,                         /* blocksize */
+    16,                         /* initial value length */
+    24,                         /* secret length -- 24*8 == 192bit */
+    0,                          /* flags */
+    &crypt_init,
+    &crypt_encrypt,
+    &crypt_dtor,
+    EVP_camellia_192_cbc
+};
+
+static const LIBSSH2_CRYPT_METHOD libssh2_crypt_method_camellia256_cbc = {
+    "camellia256-cbc",
+    16,                         /* blocksize */
+    16,                         /* initial value length */
+    32,                         /* secret length -- 32*8 == 256bit */
+    0,                          /* flags */
+    &crypt_init,
+    &crypt_encrypt,
+    &crypt_dtor,
+    EVP_camellia_256_cbc
+};
+#endif
+
+#if  LIBSSH2_CAMELLIA_CTR
+static const LIBSSH2_CRYPT_METHOD libssh2_crypt_method_camellia128_ctr = {
+    "camellia128-ctr",
+    16,                         /* blocksize */
+    16,                         /* initial value length */
+    16,                         /* secret length -- 16*8 == 128bit */
+    0,                          /* flags */
+    &crypt_init,
+    &crypt_encrypt,
+    &crypt_dtor,
+    _libssh2_EVP_camellia_128_ctr
+};
+
+static const LIBSSH2_CRYPT_METHOD libssh2_crypt_method_camellia192_ctr = {
+    "camellia192-ctr",
+    16,                         /* blocksize */
+    16,                         /* initial value length */
+    24,                         /* secret length -- 24*8 == 192bit */
+    0,                          /* flags */
+    &crypt_init,
+    &crypt_encrypt,
+    &crypt_dtor,
+    _libssh2_EVP_camellia_192_ctr
+};
+
+static const LIBSSH2_CRYPT_METHOD libssh2_crypt_method_camellia256_ctr = {
+    "camellia256-ctr",
+    16,                         /* blocksize */
+    16,                         /* initial value length */
+    32,                         /* secret length -- 32*8 == 256bit */
+    0,                          /* flags */
+    &crypt_init,
+    &crypt_encrypt,
+    &crypt_dtor,
+    _libssh2_EVP_camellia_256_ctr
+};
+#endif
+
 #if LIBSSH2_BLOWFISH
 static const LIBSSH2_CRYPT_METHOD libssh2_crypt_method_blowfish_cbc = {
     "blowfish-cbc",
@@ -311,6 +387,16 @@ static const LIBSSH2_CRYPT_METHOD libssh2_crypt_method_3des_cbc = {
 #endif
 
 static const LIBSSH2_CRYPT_METHOD *_libssh2_crypt_methods[] = {
+#if LIBSSH2_CAMELLIA_CTR
+    &libssh2_crypt_method_camellia128_ctr,
+    &libssh2_crypt_method_camellia192_ctr,
+    &libssh2_crypt_method_camellia256_ctr,
+#endif
+#if LIBSSH2_CAMELLIA
+    &libssh2_crypt_method_camellia128_cbc,
+    &libssh2_crypt_method_camellia192_cbc,
+    &libssh2_crypt_method_camellia256_cbc,
+#endif
 #if LIBSSH2_AES_CTR
   &libssh2_crypt_method_aes128_ctr,
   &libssh2_crypt_method_aes192_ctr,

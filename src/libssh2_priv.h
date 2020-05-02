@@ -85,6 +85,8 @@
 
 #ifdef HAVE_SYS_SOCKET_H
 # include <sys/socket.h>
+#else
+# include <winsock2.h>
 #endif
 #ifdef HAVE_SYS_IOCTL_H
 # include <sys/ioctl.h>
@@ -452,6 +454,14 @@ struct _LIBSSH2_CHANNEL
     /* State variables used in libssh2_channel_handle_extended_data2() */
     libssh2_nonblocking_states extData2_state;
 
+    /* State variables used in libssh2_channel_request_auth_agent() */
+    libssh2_nonblocking_states req_auth_agent_try_state;
+    libssh2_nonblocking_states req_auth_agent_state;
+    unsigned char req_auth_agent_packet[36];
+    size_t req_auth_agent_packet_len;
+    unsigned char req_auth_agent_local_channel[4];
+    packet_requirev_state_t req_auth_agent_requirev_state;
+    LIBSSH2_AGENT *agent;
 };
 
 struct _LIBSSH2_LISTENER
@@ -1107,6 +1117,9 @@ int _libssh2_pem_decode_integer(unsigned char **data, unsigned int *datalen,
 /* global.c */
 void _libssh2_init_if_needed(void);
 
+/* agent.c */
+int _libssh2_agent_transaction(unsigned char **res, size_t *res_len,
+        unsigned char *req, size_t req_len, LIBSSH2_AGENT *agent);
 
 #define ARRAY_SIZE(a) (sizeof ((a)) / sizeof ((a)[0]))
 

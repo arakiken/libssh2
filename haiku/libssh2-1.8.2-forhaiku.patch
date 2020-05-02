@@ -1,0 +1,128 @@
+diff -r -u libssh2.orig/src/agent.c libssh2/src/agent.c
+--- libssh2.orig/src/agent.c	2019-09-26 09:13:34.000000000 +0900
++++ libssh2/src/agent.c	2019-09-26 08:52:45.000000000 +0900
+@@ -186,7 +186,7 @@
+     if (transctx->state == agent_NB_state_request_created) {
+         _libssh2_htonu32(buf, transctx->request_len);
+         rc = LIBSSH2_SEND_FD(agent->session, agent->fd, buf, sizeof buf, 0);
+-        if (rc == -EAGAIN)
++        if (rc == EAGAIN)
+             return LIBSSH2_ERROR_EAGAIN;
+         else if (rc < 0)
+             return _libssh2_error(agent->session, LIBSSH2_ERROR_SOCKET_SEND,
+@@ -198,7 +198,7 @@
+     if (transctx->state == agent_NB_state_request_length_sent) {
+         rc = LIBSSH2_SEND_FD(agent->session, agent->fd, transctx->request,
+                            transctx->request_len, 0);
+-        if (rc == -EAGAIN)
++        if (rc == EAGAIN)
+             return LIBSSH2_ERROR_EAGAIN;
+         else if (rc < 0)
+             return _libssh2_error(agent->session, LIBSSH2_ERROR_SOCKET_SEND,
+@@ -210,7 +210,7 @@
+     if (transctx->state == agent_NB_state_request_sent) {
+         rc = LIBSSH2_RECV_FD(agent->session, agent->fd, buf, sizeof buf, 0);
+         if (rc < 0) {
+-            if (rc == -EAGAIN)
++            if (rc == EAGAIN)
+                 return LIBSSH2_ERROR_EAGAIN;
+             return _libssh2_error(agent->session, LIBSSH2_ERROR_SOCKET_RECV,
+                                   "agent recv failed");
+@@ -229,7 +229,7 @@
+         rc = LIBSSH2_RECV_FD(agent->session, agent->fd, transctx->response,
+                            transctx->response_len, 0);
+         if (rc < 0) {
+-            if (rc == -EAGAIN)
++            if (rc == EAGAIN)
+                 return LIBSSH2_ERROR_EAGAIN;
+             return _libssh2_error(agent->session, LIBSSH2_ERROR_SOCKET_SEND,
+                                   "agent recv failed");
+diff -r -u libssh2.orig/src/misc.c libssh2/src/misc.c
+--- libssh2.orig/src/misc.c	2019-09-26 09:13:34.000000000 +0900
++++ libssh2/src/misc.c	2019-09-26 08:54:18.000000000 +0900
+@@ -141,9 +141,9 @@
+         /* Sometimes the first recv() function call sets errno to ENOENT on
+            Solaris and HP-UX */
+         if ( errno == ENOENT )
+-            return -EAGAIN;
++            return EAGAIN;
+         else
+-            return -errno;
++            return errno;
+     }
+ #endif
+     return rc;
+@@ -168,9 +168,9 @@
+ #elif defined(__VMS)
+     if (rc < 0 ) {
+         if ( errno == EWOULDBLOCK )
+-            return -EAGAIN;
++            return EAGAIN;
+         else
+-            return -errno;
++            return errno;
+     }
+ #else
+     if (rc < 0 )
+diff -r -u libssh2.orig/src/session.c libssh2/src/session.c
+--- libssh2.orig/src/session.c	2019-09-26 09:13:34.000000000 +0900
++++ libssh2/src/session.c	2019-09-26 08:53:39.000000000 +0900
+@@ -118,7 +118,7 @@
+         ret = LIBSSH2_RECV(session, &c, 1,
+                             LIBSSH2_SOCKET_RECV_FLAGS(session));
+         if (ret < 0) {
+-            if(session->api_block_mode || (ret != -EAGAIN))
++            if(session->api_block_mode || (ret != EAGAIN))
+                 /* ignore EAGAIN when non-blocking */
+                 _libssh2_debug(session, LIBSSH2_TRACE_SOCKET,
+                                "Error recving %d bytes: %d", 1, -ret);
+@@ -128,7 +128,7 @@
+                            "Recved %d bytes banner", ret);
+ 
+         if (ret < 0) {
+-            if (ret == -EAGAIN) {
++            if (ret == EAGAIN) {
+                 session->socket_block_directions =
+                     LIBSSH2_SESSION_BLOCK_INBOUND;
+                 session->banner_TxRx_total_send = banner_len;
+@@ -166,8 +166,9 @@
+     session->banner_TxRx_state = libssh2_NB_state_idle;
+     session->banner_TxRx_total_send = 0;
+ 
+-    if (!banner_len)
++    if (!banner_len) {
+         return LIBSSH2_ERROR_BANNER_RECV;
++    }
+ 
+     session->remote.banner = LIBSSH2_ALLOC(session, banner_len + 1);
+     if (!session->remote.banner) {
+@@ -242,7 +243,7 @@
+                        banner, session->banner_TxRx_total_send);
+ 
+     if (ret != (banner_len - session->banner_TxRx_total_send)) {
+-        if (ret >= 0 || ret == -EAGAIN) {
++        if (ret >= 0 || ret == EAGAIN) {
+             /* the whole packet could not be sent, save the what was */
+             session->socket_block_directions =
+                 LIBSSH2_SESSION_BLOCK_OUTBOUND;
+diff -r -u libssh2.orig/src/transport.c libssh2/src/transport.c
+--- libssh2.orig/src/transport.c	2019-09-26 09:13:34.000000000 +0900
++++ libssh2/src/transport.c	2019-09-26 08:52:15.000000000 +0900
+@@ -372,7 +372,7 @@
+             if (nread <= 0) {
+                 /* check if this is due to EAGAIN and return the special
+                    return code if so, error out normally otherwise */
+-                if ((nread < 0) && (nread == -EAGAIN)) {
++                if ((nread < 0) && (nread == EAGAIN)) {
+                     session->socket_block_directions |=
+                         LIBSSH2_SESSION_BLOCK_INBOUND;
+                     return LIBSSH2_ERROR_EAGAIN;
+@@ -665,7 +665,7 @@
+     }
+     else if (rc < 0) {
+         /* nothing was sent */
+-        if (rc != -EAGAIN)
++        if (rc != EAGAIN)
+             /* send failure! */
+             return LIBSSH2_ERROR_SOCKET_SEND;
+ 

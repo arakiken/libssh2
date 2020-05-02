@@ -36,8 +36,15 @@ case "$host" in
     CFLAGS="$CFLAGS -DLIBSSH2_WIN32"
     LIBS="$LIBS -lws2_32"
     ;;
-	*-cygwin)
-	CFLAGS="$CFLAGS -DLIBSSH2_WIN32"
+    *-cygwin)
+    CFLAGS="$CFLAGS -DLIBSSH2_WIN32"
+    case "${CC} ${CFLAGS}" in
+        *mno-cygwin*|*-mingw*)
+        LIBS="$LIBS -lws2_32"
+        ;;
+        *)
+        ;;
+    esac
     ;;
 	*darwin*)
 	CFLAGS="$CFLAGS -DLIBSSH2_DARWIN"
@@ -294,7 +301,14 @@ AM_CONDITIONAL([HAVE_SYS_UN_H], test "x$have_sys_un_h" = xyes)
 
 case $host in
   *-*-cygwin* | *-*-cegcc*)
-    # These are POSIX-like systems using BSD-like sockets API.
+    case "${CC} ${CFLAGS}" in
+      *mno-cygwin* | *-mingw*)
+        AC_CHECK_HEADERS([windows.h winsock2.h ws2tcpip.h])
+        ;;
+      *)
+        # These are POSIX-like systems using BSD-like sockets API.
+        ;;
+      esac
     ;;
   *)
     AC_CHECK_HEADERS([windows.h winsock2.h ws2tcpip.h])

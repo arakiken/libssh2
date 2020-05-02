@@ -361,7 +361,50 @@ main (int argc, char *argv[])
     }
 
     /* Request X11 */
+#if  0
     rc = libssh2_channel_x11_req(channel, 0);
+#else
+    {
+        char *cmd;
+        char *display;
+
+        rc = -1;
+        display = getenv("DISPLAY");
+
+        if (display && (cmd = alloca(61 + strlen(display) + 1))) {
+            char *xauth_file = "/tmp/xauthfile" ;
+            FILE *fp;
+
+            sprintf(cmd, "xauth -f %s generate %s MIT-MAGIC-COOKIE-1 "
+                         "untrusted 2> /dev/null", xauth_file, display);
+            system(cmd);
+            sprintf(cmd, "xauth -f %s list %s 2> /dev/null", xauth_file, display);
+
+            if ((fp = popen(cmd, "r"))) {
+                char line[512];
+                if (fgets(line, sizeof(line), fp)) {
+                    char *proto;
+                    if ((proto = strchr(line, ' '))) {
+                        char *data;
+                        proto += 2;
+                        if ((data = strchr(proto, ' '))) {
+                            char *p;
+                            *data = '\0';
+                            data += 2;
+                            if ((p = strchr(data, '\n'))) {
+                                *p = '\0';
+                                rc = libssh2_channel_x11_req_ex(channel, 0, proto, data, 0);
+                            }
+                        }
+                    }
+                }
+                fclose(fp);
+            }
+            unlink(xauth_file);
+        }
+    }
+#endif
+
     if(rc != 0) {
         fprintf(stderr, "Failed to request X11 forwarding\n");
         session_shutdown(session);

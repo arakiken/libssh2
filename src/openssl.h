@@ -109,6 +109,14 @@
 # define LIBSSH2_AES 0
 #endif
 
+#ifdef  OPENSSL_NO_CAMELLIA
+# define LIBSSH2_CAMELLIA_CTR 0
+# define LIBSSH2_CAMELLIA 0
+#else
+# define LIBSSH2_CAMELLIA_CTR 1
+# define LIBSSH2_CAMELLIA 1
+#endif
+
 #ifdef OPENSSL_NO_BF
 # define LIBSSH2_BLOWFISH 0
 #else
@@ -407,3 +415,7 @@ extern void _libssh2_dh_dtor(_libssh2_dh_ctx *dhctx);
 const EVP_CIPHER *_libssh2_EVP_aes_128_ctr(void);
 const EVP_CIPHER *_libssh2_EVP_aes_192_ctr(void);
 const EVP_CIPHER *_libssh2_EVP_aes_256_ctr(void);
+
+const EVP_CIPHER *_libssh2_EVP_camellia_128_ctr(void);
+const EVP_CIPHER *_libssh2_EVP_camellia_192_ctr(void);
+const EVP_CIPHER *_libssh2_EVP_camellia_256_ctr(void);

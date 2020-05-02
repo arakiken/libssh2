@@ -90,6 +90,11 @@
 #define SSH_AGENT_CONSTRAIN_LIFETIME 1
 #define SSH_AGENT_CONSTRAIN_CONFIRM 2
 
+#ifdef __CYGWIN__
+#define WIN32
+#include <windows.h>
+#endif
+
 /* non-blocking mode on agent connection is not yet implemented, but
    for future use. */
 typedef enum {
@@ -104,6 +109,7 @@ typedef enum {
 typedef struct agent_transaction_ctx {
     unsigned char *request;
     size_t request_len;
+    size_t request_cur_len;
     unsigned char *response;
     size_t response_len;
     agent_nonblocking_states state;
@@ -657,6 +663,41 @@ agent_publickey_to_external(struct agent_publickey *node)
     ext->node = node;
 
     return ext;
+}
+
+int _libssh2_agent_transaction(unsigned char **res, size_t *res_len,
+        unsigned char *req, size_t req_len, LIBSSH2_AGENT *agent)
+{
+    agent_transaction_ctx_t transctx = &agent->transctx;
+
+    if (transctx->request == NULL) {
+        transctx->request_len = _libssh2_ntohu32(req);
+        transctx->request = LIBSSH2_ALLOC(agent->session, transctx->request_len);
+        transctx->request_cur_len = req_len - 4;
+        memcpy(transctx->request, req + 4, transctx->request_cur_len);
+    }
+    else {
+        memcpy(transctx->request + transctx->request_cur_len, req, req_len);
+        transctx->request_cur_len += req_len ;
+    }
+
+    if (transctx->request_len > transctx->request_cur_len) {
+        return -1;
+    }
+
+    transctx->state = agent_NB_state_request_created;
+    if (agent->ops->transact(agent, transctx) == 0) {
+        *res = transctx->response;
+        *res_len = transctx->response_len;
+    }
+    else {
+        *res_len = 0;
+    }
+
+    LIBSSH2_FREE(agent->session, transctx->request);
+    transctx->request = NULL;
+
+    return 0;
 }
 
 /*

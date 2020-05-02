@@ -651,6 +651,65 @@ _libssh2_packet_add(LIBSSH2_SESSION * session, unsigned char *data,
                                stream_id);
             }
 #endif
+
+            if (memcmp(channelp->channel_type, "auth-agent@openssh.com" , 22) == 0) {
+                unsigned char *res;
+                size_t res_len;
+
+                if (!channelp->agent) {
+                    if (!(channelp->agent = libssh2_agent_init(session))) {
+						rc = libssh2_session_last_errno(session);
+                        goto  auth_agent_end;
+                    }
+
+                    if ((rc = libssh2_agent_connect(channelp->agent)) != 0) {
+                        libssh2_agent_free(channelp->agent);
+                        channelp->agent = NULL;
+                        goto  auth_agent_end;
+                    }
+                }
+
+            #if  0
+                fprintf(stderr,"DATA TO AGENT %d (%.2x %.2x %.2x %.2x %.2x ...)\n",
+                    _libssh2_ntohu32(data + 5),
+                    data[data_head], data[data_head + 1],
+                    data[data_head + 2], data[data_head + 3],
+                    data[data_head + 4]);
+            #endif
+
+                if (_libssh2_agent_transaction(&res, &res_len, data + data_head,
+                        _libssh2_ntohu32(data + 5), channelp->agent) == 0) {
+                    if (res_len > 0) {
+                        unsigned char * s = channelp->write_packet;
+
+                        *(s++) = SSH_MSG_CHANNEL_DATA;
+                        _libssh2_store_u32(&s, channelp->remote.id);
+                        _libssh2_store_u32(&s, res_len + 4);
+                        _libssh2_store_u32(&s, res_len);
+                        rc = _libssh2_transport_send(session,
+                                channelp->write_packet, s - channelp->write_packet,
+                                res, res_len);
+                        LIBSSH2_FREE(session, res);
+                    #if  0
+                        if (rc == 0) {
+                            fprintf(stderr,"DATA FROM AGENT %d (%.2x ...) \n",
+                                res_len, res[0]);
+                        }
+                    #endif
+                    }
+                    else {
+                        libssh2_agent_disconnect(channelp->agent);
+                        libssh2_agent_free(channelp->agent);
+                        channelp->agent = NULL ;
+                    }
+                }
+
+            auth_agent_end:
+                LIBSSH2_FREE(session, data);
+                session->packAdd_state = libssh2_NB_state_idle;
+                return rc;
+            }
+
             if((channelp->remote.extended_data_ignore_mode ==
                  LIBSSH2_CHANNEL_EXTENDED_DATA_IGNORE) &&
                 (msg == SSH_MSG_CHANNEL_EXTENDED_DATA)) {
@@ -936,6 +995,47 @@ _libssh2_packet_add(LIBSSH2_SESSION * session, unsigned char *data,
                 rc = packet_x11_open(session, data, datalen,
                                      &session->packAdd_x11open_state);
             }
+            else if ((datalen >= (sizeof("auth-agent@openssh.com") + 4)) &&
+                     ((sizeof("auth-agent@openssh.com") - 1) == _libssh2_ntohu32(data + 1)) &&
+                     (memcmp(data + 5, "auth-agent@openssh.com" ,
+                          sizeof("auth-agent@openssh.com") - 1) == 0)) {
+                LIBSSH2_CHANNEL *c;
+                unsigned char *s = data + (sizeof("auth-agent@openssh.com") - 1) + 5;
+                unsigned char packet[17] ;
+                unsigned char *p;
+
+                c = LIBSSH2_ALLOC(session, sizeof(LIBSSH2_CHANNEL));
+                memset(c, 0, sizeof(LIBSSH2_CHANNEL));
+                c->session = session;
+                c->channel_type_len = sizeof("auth-agent@openssh.com") - 1;
+                c->channel_type = LIBSSH2_ALLOC(session,c->channel_type_len + 1);
+                memcpy(c->channel_type, "auth-agent@openssh.com", c->channel_type_len + 1);
+                c->remote.id = _libssh2_ntohu32(s);
+                s += 4;
+                c->remote.window_size_initial = LIBSSH2_CHANNEL_WINDOW_DEFAULT;
+                c->remote.window_size = LIBSSH2_CHANNEL_WINDOW_DEFAULT;
+                c->remote.packet_size = LIBSSH2_CHANNEL_PACKET_DEFAULT;
+
+                c->local.id = _libssh2_channel_nextid(session);
+                c->local.window_size_initial = _libssh2_ntohu32(s);
+                s += 4 ;
+                c->local.packet_size = _libssh2_ntohu32(s);
+                s += 4 ;
+
+                p = packet ;
+                *(p++) = SSH_MSG_CHANNEL_OPEN_CONFIRMATION ;
+                _libssh2_store_u32(&p, c->remote.id) ;
+                _libssh2_store_u32(&p, c->local.id) ;
+                _libssh2_store_u32(&p, c->remote.window_size_initial) ;
+                _libssh2_store_u32(&p, c->remote.packet_size) ;
+                if ((rc = _libssh2_transport_send(session, packet, 17, NULL, 0)) == 0) {
+                    _libssh2_list_add(&session->channels, &c->node);
+                }
+                else {
+                    LIBSSH2_FREE(session,c);
+                }
+            }
+
             if(rc == LIBSSH2_ERROR_EAGAIN)
                 return rc;
 
