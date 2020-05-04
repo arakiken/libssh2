@@ -755,10 +755,19 @@ camellia_ctr_do_cipher(EVP_CIPHER_CTX *ctx, u_char *dest, const u_char *src,
 	return (1);
 }
 
-static const EVP_CIPHER *
+static EVP_CIPHER *
 camellia_make_ctr_evp (size_t keylen, EVP_CIPHER *camellia_ctr_cipher)
 {
-    memset(camellia_ctr_cipher,0,sizeof(EVP_CIPHER));
+#ifdef HAVE_OPAQUE_STRUCTS
+	camellia_ctr_cipher = EVP_CIPHER_meth_new(NID_undef, CAMELLIA_BLOCK_SIZE, keylen);
+	if (camellia_ctr_cipher) {
+		EVP_CIPHER_meth_set_iv_length(camellia_ctr_cipher, CAMELLIA_BLOCK_SIZE);
+		EVP_CIPHER_meth_set_init(camellia_ctr_cipher, camellia_ctr_init);
+		EVP_CIPHER_meth_set_do_cipher(camellia_ctr_cipher, camellia_ctr_do_cipher);
+		EVP_CIPHER_meth_set_cleanup(camellia_ctr_cipher, camellia_ctr_cleanup);
+	}
+#else
+    memset(camellia_ctr_cipher, 0, sizeof(EVP_CIPHER));
     camellia_ctr_cipher->nid = NID_undef;
     camellia_ctr_cipher->block_size = CAMELLIA_BLOCK_SIZE;
     camellia_ctr_cipher->key_len = keylen;
@@ -766,6 +775,7 @@ camellia_make_ctr_evp (size_t keylen, EVP_CIPHER *camellia_ctr_cipher)
     camellia_ctr_cipher->init = camellia_ctr_init;
     camellia_ctr_cipher->do_cipher = camellia_ctr_do_cipher;
     camellia_ctr_cipher->cleanup = camellia_ctr_cleanup;
+#endif
 
     return camellia_ctr_cipher;
 }
@@ -773,25 +783,46 @@ camellia_make_ctr_evp (size_t keylen, EVP_CIPHER *camellia_ctr_cipher)
 const EVP_CIPHER *
 _libssh2_EVP_camellia_128_ctr(void)
 {
+#ifdef HAVE_OPAQUE_STRUCTS
+    static EVP_CIPHER* camellia_ctr_cipher;
+    return !camellia_ctr_cipher ?
+		(camellia_ctr_cipher = camellia_make_ctr_evp(16, camellia_ctr_cipher)) :
+		camellia_ctr_cipher;
+#else
     static EVP_CIPHER camellia_ctr_cipher;
     return !camellia_ctr_cipher.key_len?
-        camellia_make_ctr_evp (16, &camellia_ctr_cipher) : &camellia_ctr_cipher;
+        camellia_make_ctr_evp(16, &camellia_ctr_cipher) : &camellia_ctr_cipher;
+#endif
 }
 
 const EVP_CIPHER *
 _libssh2_EVP_camellia_192_ctr(void)
 {
+#ifdef HAVE_OPAQUE_STRUCTS
+    static EVP_CIPHER* camellia_ctr_cipher;
+    return !camellia_ctr_cipher ?
+		(camellia_ctr_cipher = camellia_make_ctr_evp(24, camellia_ctr_cipher)) :
+		camellia_ctr_cipher;
+#else
     static EVP_CIPHER camellia_ctr_cipher;
     return !camellia_ctr_cipher.key_len?
         camellia_make_ctr_evp (24, &camellia_ctr_cipher) : &camellia_ctr_cipher;
+#endif
 }
 
 const EVP_CIPHER *
 _libssh2_EVP_camellia_256_ctr(void)
 {
+#ifdef HAVE_OPAQUE_STRUCTS
+    static EVP_CIPHER* camellia_ctr_cipher;
+    return !camellia_ctr_cipher ?
+		(camellia_ctr_cipher = camellia_make_ctr_evp(32, camellia_ctr_cipher)) :
+		camellia_ctr_cipher;
+#else
     static EVP_CIPHER camellia_ctr_cipher;
     return !camellia_ctr_cipher.key_len?
         camellia_make_ctr_evp (32, &camellia_ctr_cipher) : &camellia_ctr_cipher;
+#endif
 }
 
 #endif	/* LIBSSH2_CAMELLIA */
